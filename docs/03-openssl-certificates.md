@@ -6,21 +6,6 @@
 
 ## 🔧 OpenSSL 설치 및 설정
 
-### Windows에서 OpenSSL 설치
-
-#### 방법 1: Chocolatey 사용 (권장)
-```powershell
-# Chocolatey 설치 (관리자 권한으로 실행)
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# OpenSSL 설치
-choco install openssl
-```
-
-#### 방법 2: 직접 다운로드
-1. [OpenSSL 공식 사이트](https://slproweb.com/products/Win32OpenSSL.html)에서 다운로드
-2. 설치 후 환경변수 PATH에 추가
-
 ### macOS에서 OpenSSL 설치
 ```bash
 # Homebrew 사용
@@ -419,9 +404,6 @@ openssl verify -CAfile certs/ca/ca-cert.pem certs/server/server-cert.pem
 #### 3. "unable to get local issuer certificate" 오류
 ```bash
 # 해결 방법: CA 인증서를 신뢰 저장소에 추가
-# Windows
-certlm.msc
-
 # macOS
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certs/ca/ca-cert.pem
 

@@ -55,17 +55,29 @@ sudo port install mkcert
 ```
 
 ### Linux에서 설치
+
+#### Ubuntu/Debian
 ```bash
-# Ubuntu/Debian
+# 1단계: 의존성 설치
 sudo apt install libnss3-tools
+
+# 2단계: mkcert 바이너리 다운로드 및 설치
 wget -O mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
 chmod +x mkcert
 sudo mv mkcert /usr/local/bin/
+```
 
-# CentOS/RHEL
+#### CentOS/RHEL/Fedora
+```bash
+# 1단계: 의존성 설치
 sudo yum install nss-tools
 # 또는
 sudo dnf install nss-tools
+
+# 2단계: mkcert 바이너리 다운로드 및 설치
+wget -O mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
+chmod +x mkcert
+sudo mv mkcert /usr/local/bin/
 ```
 
 ### 설치 확인

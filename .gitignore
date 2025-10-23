@@ -295,6 +295,7 @@ reports/
 *.dll
 *.so
 *.dylib
+mkcert
 
 # 미디어 파일 (실습용)
 *.jpg

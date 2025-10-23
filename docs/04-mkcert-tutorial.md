@@ -45,25 +45,6 @@ graph TD
 
 ## 📦 mkcert 설치
 
-### Windows에서 설치
-
-#### 방법 1: Chocolatey 사용 (권장)
-```powershell
-# Chocolatey로 설치
-choco install mkcert
-```
-
-#### 방법 2: Scoop 사용
-```powershell
-# Scoop으로 설치
-scoop install mkcert
-```
-
-#### 방법 3: 직접 다운로드
-1. [mkcert GitHub 릴리스](https://github.com/FiloSottile/mkcert/releases)에서 다운로드
-2. `mkcert-v1.4.4-windows-amd64.exe`를 `mkcert.exe`로 이름 변경
-3. PATH에 추가
-
 ### macOS에서 설치
 ```bash
 # Homebrew 사용
@@ -122,7 +103,6 @@ sequenceDiagram
 ```bash
 # CA 인증서 위치 확인
 mkcert -CAROOT
-# Windows: C:\Users\사용자명\AppData\Local\mkcert
 # macOS: /Users/사용자명/Library/Application Support/mkcert
 # Linux: /home/사용자명/.local/share/mkcert
 ```
@@ -431,8 +411,6 @@ which mkcert
 ```bash
 # 해결 방법: 관리자 권한으로 실행
 sudo mkcert -install
-# 또는
-# Windows: 관리자 권한으로 PowerShell 실행
 ```
 
 #### 3. "certificate verify failed" 오류

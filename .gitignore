@@ -55,6 +55,7 @@ ca.crt
 ca.srl
 ca.crl
 ca.pem
+ca.conf
 ca-key.pem
 
 # 서버 인증서 파일
@@ -97,6 +98,7 @@ certificates/
 ssl/
 keys/
 pki/
+config/
 
 # 업로드된 파일들
 uploads/

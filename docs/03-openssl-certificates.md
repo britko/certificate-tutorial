@@ -218,6 +218,9 @@ EOF
 
 ### 4단계: CA 데이터베이스 초기화
 ```bash
+# 필요한 디렉토리 생성
+mkdir -p certs/ca/{newcerts,crl}
+
 # CA 데이터베이스 파일 생성
 touch certs/ca/index.txt
 echo 1000 > certs/ca/serial
@@ -295,6 +298,7 @@ echo "================================"
 
 # 디렉토리 생성
 mkdir -p certs/{ca,server,client}
+mkdir -p certs/ca/{newcerts,crl}
 mkdir -p config
 
 # Root CA 생성
@@ -366,6 +370,31 @@ openssl x509 -in certs/server/server-cert.pem -text -noout
 openssl x509 -in certs/client/client-cert.pem -text -noout
 ```
 
+**예상 결과:**
+```
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1000 (0x3e8)
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=KR, ST=Seoul, L=Seoul, O=MyCompany, OU=IT, CN=MyCompany Root CA
+        Validity
+            Not Before: Jan  1 00:00:00 2024 GMT
+            Not After : Dec 31 23:59:59 2033 GMT
+        Subject: C=KR, ST=Seoul, L=Seoul, O=MyCompany, OU=IT, CN=localhost
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (4096 bit)
+        X509v3 extensions:
+            X509v3 Basic Constraints:
+                CA:FALSE
+            X509v3 Key Usage:
+                Digital Signature, Key Encipherment
+            X509v3 Extended Key Usage:
+                TLS Web Server Authentication
+    Signature Algorithm: sha256WithRSAEncryption
+```
+
 ### 2. 인증서 체인 검증
 ```bash
 # 서버 인증서 검증
@@ -375,6 +404,26 @@ openssl verify -CAfile certs/ca/ca-cert.pem certs/server/server-cert.pem
 openssl verify -CAfile certs/ca/ca-cert.pem certs/client/client-cert.pem
 ```
 
+**예상 결과:**
+```bash
+# 서버 인증서 검증 성공
+certs/server/server-cert.pem: OK
+
+# 클라이언트 인증서 검증 성공
+certs/client/client-cert.pem: OK
+```
+
+**❌ 실패 시 나타나는 오류:**
+```bash
+# 인증서가 유효하지 않은 경우
+certs/server/server-cert.pem: verification failed
+140123456789012:error:2F06D064:system library:func(245):reason(100):No such file or directory:../crypto/bio/bss_file.c:67:cannot open certs/ca/ca-cert.pem
+
+# CA 인증서가 없는 경우
+certs/server/server-cert.pem: C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN = localhost
+error 20 at 0 depth lookup:unable to get local issuer certificate
+```
+
 ### 3. HTTPS 서버 테스트
 ```bash
 # OpenSSL을 사용한 HTTPS 서버 테스트
@@ -382,6 +431,65 @@ openssl s_server -cert certs/server/server-cert.pem -key certs/server/server-key
 
 # 다른 터미널에서 테스트
 openssl s_client -connect localhost:8443 -CAfile certs/ca/ca-cert.pem
+```
+
+**서버 시작 시 예상 결과:**
+```bash
+Using default temp DH parameters
+ACCEPT
+```
+
+**클라이언트 연결 시 예상 결과:**
+```bash
+CONNECTED(00000003)
+depth=0 C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN = localhost
+verify return:1
+---
+Certificate chain
+ 0 s:C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN = localhost
+   i:C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN =MyCompany Root CA
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAO8Q8Q8Q8Q8QMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+... (인증서 내용) ...
+-----END CERTIFICATE-----
+subject=C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN = localhost
+issuer=C = KR, ST = Seoul, L = Seoul, O = MyCompany, OU = IT, CN = MyCompany Root CA
+---
+No client certificate CA names sent
+Peer signing digest: SHA256
+Peer signature type: RSA-PSS
+Server Temp Key: X25519, 253 bits
+---
+SSL handshake has read 1234 bytes and written 456 bytes
+Verification: OK
+---
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Server public key is 4096 bit
+Secure Renegotiation IS NOT supported
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 0 (ok)
+---
+```
+
+**✅ 성공 지표:**
+- `Verification: OK` - 인증서 검증 성공
+- `Verify return code: 0 (ok)` - 연결 성공
+- `SSL handshake has read/written` - SSL 핸드셰이크 완료
+
+**❌ 실패 시 나타나는 오류:**
+```bash
+# 인증서 검증 실패
+Verification: FAILED
+Verify return code: 19 (self signed certificate in certificate chain)
+
+# 연결 실패
+CONNECTED(00000003)
+140123456789012:error:14094410:SSL routines:ssl3_read_bytes:sslv3 alert handshake failure:../ssl/record/rec_layer_s3.c:1544:SSL alert number 40
 ```
 
 ## 🔍 문제 해결

@@ -2,1825 +2,1166 @@
 
 ## 🎯 이 장에서 배울 내용
 
-이 장에서는 실제 개발 환경에서 자주 발생하는 시나리오를 바탕으로 사설 인증서를 활용하는 실습을 진행합니다. 각 시나리오는 단계별로 구성되어 있어 따라하기 쉽게 설계되었습니다.
+이 장에서는 실제 개발 환경에서 발생하는 구체적인 문제 상황을 바탕으로 사설 인증서를 활용한 해결 방법을 단계별로 실습합니다. 이론적 지식이 아닌 실제로 마주칠 수 있는 현실적인 시나리오를 통해 사설 인증서의 필요성과 활용법을 깊이 있게 이해할 수 있습니다.
 
-## 🏢 시나리오 1: 마이크로서비스 아키텍처 개발
+## 🏢 실제 시나리오: 스타트업의 급성장 통신 보안 문제
 
-### 상황 설명
-**회사**: 중견 IT 기업  
-**팀**: 백엔드 개발팀 (5명)  
-**프로젝트**: 전자상거래 플랫폼 마이크로서비스 개발  
-**문제**: 각 서비스 간 HTTPS 통신이 필요하지만 개발 단계에서는 공인 인증서 사용이 비효율적
+### 📋 상황 배경
 
-### 아키텍처 다이어그램
+**회사**: 핀테크 스타트업 "SecurePay" (직원 15명)  
+**서비스**: 모바일 결제 솔루션  
+**현재 상황**: 시리즈 A 투자 유치 후 급격한 사용자 증가  
+**핵심 문제**: 개발팀의 보안 인프라 부족으로 인한 서비스 안정성 위험
 
+### 🚨 발생한 구체적인 문제들
+
+#### 1. 개발 환경의 보안 허점
+```bash
+# 현재 상황: 개발자들이 HTTP로만 테스트
+curl http://api-dev.securepay.com/users
+# 결과: 브라우저에서 "Not Secure" 경고
+# 문제: 실제 프로덕션과 다른 환경으로 인한 버그 발생
+```
+
+#### 2. 마이크로서비스 간 통신 보안 부재
+```javascript
+// 현재 코드: 서비스 간 HTTP 통신
+const userService = await fetch('http://user-service:3001/api/users');
+const paymentService = await fetch('http://payment-service:3002/api/process');
+
+// 문제점:
+// - 네트워크 스니핑 가능
+// - 중간자 공격 취약
+// - 로그에서 민감 정보 노출
+```
+
+#### 3. 모바일 앱 개발의 어려움
+```swift
+// iOS 앱에서 발생하는 문제
+let url = URL(string: "https://api-dev.securepay.com")!
+// 결과: SSL certificate verification failed
+// 문제: 개발 서버의 자체 서명 인증서로 인한 연결 실패
+```
+
+#### 4. QA 팀의 테스트 환경 문제
+```bash
+# QA 팀이 겪는 문제
+# - 브라우저에서 계속 "Not Secure" 경고
+# - 자동화 테스트에서 SSL 오류 발생
+# - 모바일 디바이스에서 앱 연결 실패
+```
+
+### 💰 비즈니스 임팩트
+
+| 문제 | 비즈니스 영향 | 예상 손실 |
+|------|---------------|-----------|
+| **개발 지연** | 기능 개발 속도 저하 | 월 2억원 |
+| **보안 취약점** | 해킹 위험 증가 | 브랜드 신뢰도 하락 |
+| **QA 효율성** | 테스트 시간 증가 | 릴리스 지연 |
+| **모바일 앱** | 사용자 이탈 | 일일 활성 사용자 30% 감소 |
+
+### 🎯 해결 목표
+
+1. **개발 환경 보안 강화**: 모든 개발 서비스에 HTTPS 적용
+2. **마이크로서비스 보안**: 서비스 간 통신 암호화
+3. **모바일 앱 호환성**: 개발 서버와의 안전한 통신
+4. **QA 효율성**: 자동화 테스트 환경 개선
+5. **비용 절감**: 공인 인증서 구매 비용 절약 (월 500만원)
+
+## 🔧 단계별 해결 과정
+
+### 1단계: 현재 상황 분석 및 요구사항 정의
+
+#### 현재 아키텍처 분석
 ```mermaid
 graph TB
-    A[API Gateway] --> B[User Service]
-    A --> C[Product Service]
-    A --> D[Order Service]
-    A --> E[Payment Service]
-    A --> F[Notification Service]
-    
-    B --> G[User Database]
-    C --> H[Product Database]
-    D --> I[Order Database]
-    E --> J[Payment Database]
-    F --> K[Notification Database]
-    
-    L[Frontend] --> A
-    M[Mobile App] --> A
-    
-    subgraph "개발 환경"
-        A
-        B
-        C
-        D
-        E
-        F
+    subgraph "현재 문제 상황"
+        A[Frontend App] -->|HTTP| B[API Gateway]
+        B -->|HTTP| C[User Service]
+        B -->|HTTP| D[Payment Service]
+        B -->|HTTP| E[Notification Service]
+        
+        F[Mobile App] -->|HTTPS 실패| B
+        G[QA Test Suite] -->|SSL 오류| B
+        
+        H[Developer Laptop] -->|HTTP만 가능| B
     end
     
-    subgraph "데이터베이스"
-        G
-        H
-        I
-        J
-        K
+    subgraph "문제점"
+        I[SSL 인증서 없음]
+        J[서비스 간 암호화 없음]
+        K[개발/프로덕션 환경 차이]
     end
 ```
 
-### 실습 단계
+#### 요구사항 정의
+```yaml
+보안 요구사항:
+  - 모든 API 엔드포인트 HTTPS 적용
+  - 마이크로서비스 간 TLS 통신
+  - 모바일 앱 호환 인증서
+  - 개발자별 독립적인 테스트 환경
 
-#### 1단계: 프로젝트 구조 설정
-```bash
-# 프로젝트 디렉토리 생성
-mkdir ecommerce-microservices
-cd ecommerce-microservices
+기술 요구사항:
+  - Docker 컨테이너 환경 지원
+  - CI/CD 파이프라인 통합
+  - 자동화 테스트 호환
+  - 로컬 개발 환경 지원
 
-# 마이크로서비스 디렉토리 구조 생성
-mkdir -p services/{api-gateway,user-service,product-service,order-service,payment-service,notification-service}
-mkdir -p shared/{certificates,config,scripts}
-mkdir -p docker/{nginx,postgres,redis}
+비즈니스 요구사항:
+  - 최소 비용으로 구현
+  - 빠른 배포 가능
+  - 유지보수 용이성
+  - 확장 가능한 구조
 ```
 
-#### 2단계: 공통 인증서 생성
+### 2단계: 사설 인증서 기반 보안 인프라 구축
+
+#### Root CA 생성 및 배포
 ```bash
-# 공통 CA 생성
-mkcert -install
+#!/bin/bash
+# setup-ca.sh - 회사 전체 CA 설정
 
-# 각 서비스용 인증서 생성
-mkcert api-gateway.localhost 127.0.0.1 ::1
-mkcert user-service.localhost 127.0.0.1 ::1
-mkcert product-service.localhost 127.0.0.1 ::1
-mkcert order-service.localhost 127.0.0.1 ::1
-mkcert payment-service.localhost 127.0.0.1 ::1
-mkcert notification-service.localhost 127.0.0.1 ::1
+echo "🏢 SecurePay 개발 환경 CA 설정 시작..."
 
-# 인증서를 공통 디렉토리로 복사
-cp *.pem shared/certificates/
-cp *-key.pem shared/certificates/
+# 1. CA 디렉토리 구조 생성
+mkdir -p ca/{certs,private,crl,newcerts}
+mkdir -p services/{api-gateway,user-service,payment-service,notification-service}
+
+# 2. Root CA 생성 (10년 유효)
+openssl genrsa -out ca/private/securepay-root-ca.key 4096
+openssl req -new -x509 -days 3650 -key ca/private/securepay-root-ca.key \
+    -out ca/certs/securepay-root-ca.crt \
+    -subj "/C=KR/ST=Seoul/L=Seoul/O=SecurePay/OU=IT/CN=SecurePay Root CA"
+
+# 3. CA 설정 파일 생성
+cat > ca/ca.conf << 'EOF'
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir = ./ca
+certs = $dir/certs
+crl_dir = $dir/crl
+new_certs_dir = $dir/newcerts
+database = $dir/index.txt
+serial = $dir/serial
+RANDFILE = $dir/.rand
+
+private_key = $dir/private/securepay-root-ca.key
+certificate = $dir/certs/securepay-root-ca.crt
+
+crlnumber = $dir/crlnumber
+crl = $dir/crl/securepay-root-ca.crl
+crl_extensions = crl_ext
+default_crl_days = 30
+
+default_md = sha256
+name_opt = ca_default
+cert_opt = ca_default
+default_days = 365
+preserve = no
+policy = policy_strict
+
+[ policy_strict ]
+countryName = match
+stateOrProvinceName = match
+organizationName = match
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[ req ]
+default_bits = 4096
+distinguished_name = req_distinguished_name
+string_mask = utf8only
+default_md = sha256
+x509_extensions = v3_ca
+
+[ req_distinguished_name ]
+countryName = Country Name (2 letter code)
+stateOrProvinceName = State or Province Name
+localityName = Locality Name
+0.organizationName = Organization Name
+organizationalUnitName = Organizational Unit Name
+commonName = Common Name
+emailAddress = Email Address
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+[ v3_intermediate_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+[ usr_cert ]
+basicConstraints = CA:FALSE
+nsCertType = client, email
+nsComment = "OpenSSL Generated Client Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, emailProtection
+
+[ server_cert ]
+basicConstraints = CA:FALSE
+nsCertType = server
+nsComment = "OpenSSL Generated Server Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer:always
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always
+EOF
+
+# 4. CA 데이터베이스 초기화
+touch ca/index.txt
+echo 1000 > ca/serial
+echo 1000 > ca/crlnumber
+
+echo "✅ SecurePay Root CA 설정 완료"
+echo "📁 CA 인증서: ca/certs/securepay-root-ca.crt"
+echo "🔑 CA 개인키: ca/private/securepay-root-ca.key"
 ```
 
-#### 3단계: API Gateway 설정 (Nginx)
+#### 개발자 워크스테이션 설정
+```bash
+#!/bin/bash
+# setup-dev-workstation.sh - 개발자 개별 환경 설정
+
+echo "👨‍💻 개발자 워크스테이션 설정 시작..."
+
+# 1. CA 인증서를 시스템 신뢰 저장소에 추가
+echo "🔐 CA 인증서를 시스템에 설치 중..."
+
+# macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca/certs/securepay-root-ca.crt
+    echo "✅ macOS 신뢰 저장소에 CA 인증서 추가 완료"
+fi
+
+# Linux
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    sudo cp ca/certs/securepay-root-ca.crt /usr/local/share/ca-certificates/securepay-root-ca.crt
+    sudo update-ca-certificates
+    echo "✅ Linux 신뢰 저장소에 CA 인증서 추가 완료"
+fi
+
+# 2. 개발자별 개인 인증서 생성
+DEVELOPER_NAME=${1:-"developer"}
+echo "👤 개발자 인증서 생성: $DEVELOPER_NAME"
+
+# 개발자 개인키 생성
+openssl genrsa -out "certs/${DEVELOPER_NAME}-key.pem" 4096
+
+# 개발자 CSR 생성
+openssl req -new -key "certs/${DEVELOPER_NAME}-key.pem" \
+    -out "certs/${DEVELOPER_NAME}.csr" \
+    -subj "/C=KR/ST=Seoul/L=Seoul/O=SecurePay/OU=Development/CN=${DEVELOPER_NAME}.securepay.local"
+
+# 개발자 인증서 서명
+openssl ca -config ca/ca.conf -extensions usr_cert -days 365 \
+    -notext -md sha256 -in "certs/${DEVELOPER_NAME}.csr" \
+    -out "certs/${DEVELOPER_NAME}-cert.pem"
+
+echo "✅ 개발자 인증서 생성 완료"
+echo "📁 인증서: certs/${DEVELOPER_NAME}-cert.pem"
+echo "🔑 개인키: certs/${DEVELOPER_NAME}-key.pem"
+```
+
+### 3단계: 마이크로서비스 보안 통신 구현
+
+#### API Gateway HTTPS 설정
 ```nginx
-# docker/nginx/nginx.conf
-events {
-    worker_connections 1024;
+# nginx.conf - API Gateway 설정
+upstream user_service {
+    server user-service:3001;
 }
 
-http {
-    upstream user-service {
-        server user-service:3001;
+upstream payment_service {
+    server payment-service:3002;
+}
+
+upstream notification_service {
+    server notification-service:3003;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api-dev.securepay.local *.securepay.local;
+    
+    # SSL 인증서 설정
+    ssl_certificate /etc/ssl/certs/api-gateway-cert.pem;
+    ssl_certificate_key /etc/ssl/private/api-gateway-key.pem;
+    
+    # SSL 보안 설정
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # 클라이언트 인증서 검증 (선택적)
+    ssl_client_certificate /etc/ssl/certs/securepay-root-ca.crt;
+    ssl_verify_client optional;
+    
+    # API 라우팅
+    location /api/users {
+        proxy_pass https://user_service;
+        proxy_ssl_certificate /etc/ssl/certs/api-gateway-cert.pem;
+        proxy_ssl_certificate_key /etc/ssl/private/api-gateway-key.pem;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/securepay-root-ca.crt;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 2;
     }
     
-    upstream product-service {
-        server product-service:3002;
+    location /api/payments {
+        proxy_pass https://payment_service;
+        proxy_ssl_certificate /etc/ssl/certs/api-gateway-cert.pem;
+        proxy_ssl_certificate_key /etc/ssl/private/api-gateway-key.pem;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/securepay-root-ca.crt;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 2;
     }
     
-    upstream order-service {
-        server order-service:3003;
-    }
-    
-    upstream payment-service {
-        server payment-service:3004;
-    }
-    
-    upstream notification-service {
-        server notification-service:3005;
-    }
-    
-    # API Gateway HTTPS 설정
-    server {
-        listen 443 ssl http2;
-        server_name api-gateway.localhost;
-        
-        ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-        ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-        
-        # 보안 헤더
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        add_header X-Content-Type-Options nosniff;
-        add_header X-Frame-Options DENY;
-        
-        # 사용자 서비스 프록시
-        location /api/users/ {
-            proxy_pass https://user-service:3001/;
-            proxy_ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-            proxy_ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # 상품 서비스 프록시
-        location /api/products/ {
-            proxy_pass https://product-service:3002/;
-            proxy_ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-            proxy_ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # 주문 서비스 프록시
-        location /api/orders/ {
-            proxy_pass https://order-service:3003/;
-            proxy_ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-            proxy_ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # 결제 서비스 프록시
-        location /api/payments/ {
-            proxy_pass https://payment-service:3004/;
-            proxy_ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-            proxy_ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # 알림 서비스 프록시
-        location /api/notifications/ {
-            proxy_pass https://notification-service:3005/;
-            proxy_ssl_certificate /etc/nginx/ssl/api-gateway.localhost.pem;
-            proxy_ssl_certificate_key /etc/nginx/ssl/api-gateway.localhost-key.pem;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
+    location /api/notifications {
+        proxy_pass https://notification_service;
+        proxy_ssl_certificate /etc/ssl/certs/api-gateway-cert.pem;
+        proxy_ssl_certificate_key /etc/ssl/private/api-gateway-key.pem;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/securepay-root-ca.crt;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 2;
     }
 }
 ```
 
-#### 4단계: 사용자 서비스 구현
+#### User Service Node.js 구현
 ```javascript
-// services/user-service/server.js
+// user-service/server.js
 const express = require('express');
 const https = require('https');
 const fs = require('fs');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3001;
-
-// 미들웨어 설정
-app.use(cors({
-    origin: ['https://api-gateway.localhost', 'https://127.0.0.1'],
-    credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
-// 보안 헤더 미들웨어
-app.use((req, res, next) => {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    next();
-});
-
-// 사용자 관련 라우트
-app.get('/health', (req, res) => {
-    res.json({
-        service: 'user-service',
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        protocol: req.protocol
-    });
-});
-
-app.get('/users', (req, res) => {
-    res.json([
-        { id: 1, name: '홍길동', email: 'hong@example.com', role: 'customer' },
-        { id: 2, name: '김철수', email: 'kim@example.com', role: 'admin' }
-    ]);
-});
-
-app.get('/users/:id', (req, res) => {
-    const { id } = req.params;
-    res.json({
-        id: parseInt(id),
-        name: '홍길동',
-        email: 'hong@example.com',
-        role: 'customer',
-        createdAt: '2023-01-01T00:00:00Z'
-    });
-});
-
-app.post('/users', (req, res) => {
-    const { name, email, role } = req.body;
-    res.json({
-        id: Date.now(),
-        name,
-        email,
-        role: role || 'customer',
-        createdAt: new Date().toISOString()
-    });
-});
-
-// HTTPS 서버 설정
-const options = {
-    key: fs.readFileSync('../shared/certificates/user-service.localhost-key.pem'),
-    cert: fs.readFileSync('../shared/certificates/user-service.localhost.pem')
+// SSL 옵션 설정
+const sslOptions = {
+    key: fs.readFileSync('/etc/ssl/private/user-service-key.pem'),
+    cert: fs.readFileSync('/etc/ssl/certs/user-service-cert.pem'),
+    ca: fs.readFileSync('/etc/ssl/certs/securepay-root-ca.crt'),
+    requestCert: true,  // 클라이언트 인증서 요구
+    rejectUnauthorized: true  // 신뢰할 수 없는 인증서 거부
 };
 
-https.createServer(options, app).listen(PORT, () => {
-    console.log(`👤 사용자 서비스가 https://user-service.localhost:${PORT}에서 실행 중입니다.`);
+// 사용자 데이터 (실제로는 데이터베이스 사용)
+const users = [
+    { id: 1, name: '김철수', email: 'kim@securepay.com', balance: 1000000 },
+    { id: 2, name: '이영희', email: 'lee@securepay.com', balance: 500000 },
+    { id: 3, name: '박민수', email: 'park@securepay.com', balance: 2000000 }
+];
+
+// API 엔드포인트
+app.get('/api/users', (req, res) => {
+    console.log('🔐 클라이언트 인증서 정보:', req.socket.getPeerCertificate());
+    res.json(users);
+});
+
+app.get('/api/users/:id', (req, res) => {
+    const user = users.find(u => u.id === parseInt(req.params.id));
+    if (!user) {
+        return res.status(404).json({ error: '사용자를 찾을 수 없습니다' });
+    }
+    res.json(user);
+});
+
+app.post('/api/users/:id/balance', (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { amount } = req.body;
+    
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+        return res.status(404).json({ error: '사용자를 찾을 수 없습니다' });
+    }
+    
+    user.balance += amount;
+    console.log(`💰 사용자 ${user.name}의 잔액이 ${amount}원 변경됨`);
+    
+    res.json({ 
+        message: '잔액이 성공적으로 업데이트되었습니다',
+        newBalance: user.balance 
+    });
+});
+
+// HTTPS 서버 시작
+const server = https.createServer(sslOptions, app);
+server.listen(3001, '0.0.0.0', () => {
+    console.log('🔐 User Service가 HTTPS로 실행 중입니다 (포트: 3001)');
+    console.log('📋 사용 가능한 엔드포인트:');
+    console.log('  - GET /api/users - 모든 사용자 조회');
+    console.log('  - GET /api/users/:id - 특정 사용자 조회');
+    console.log('  - POST /api/users/:id/balance - 잔액 업데이트');
+});
+
+// 서비스 간 통신을 위한 클라이언트 설정
+const paymentServiceClient = https.createAgent({
+    key: fs.readFileSync('/etc/ssl/private/user-service-key.pem'),
+    cert: fs.readFileSync('/etc/ssl/certs/user-service-cert.pem'),
+    ca: fs.readFileSync('/etc/ssl/certs/securepay-root-ca.crt'),
+    rejectUnauthorized: true
+});
+
+// Payment Service와의 통신 예시
+app.post('/api/users/:id/transfer', async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { targetUserId, amount } = req.body;
+    
+    try {
+        // Payment Service에 결제 요청
+        const paymentResponse = await fetch('https://payment-service:3002/api/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fromUserId: userId, toUserId: targetUserId, amount }),
+            agent: paymentServiceClient
+        });
+        
+        const paymentResult = await paymentResponse.json();
+        
+        if (paymentResult.success) {
+            // 잔액 업데이트
+            const user = users.find(u => u.id === userId);
+            const targetUser = users.find(u => u.id === targetUserId);
+            
+            user.balance -= amount;
+            targetUser.balance += amount;
+            
+            res.json({ 
+                message: '송금이 성공적으로 완료되었습니다',
+                transactionId: paymentResult.transactionId 
+            });
+        } else {
+            res.status(400).json({ error: '송금 처리 중 오류가 발생했습니다' });
+        }
+    } catch (error) {
+        console.error('송금 처리 오류:', error);
+        res.status(500).json({ error: '서버 오류가 발생했습니다' });
+    }
 });
 ```
 
-#### 5단계: Docker Compose 설정
+### 4단계: Docker 환경 통합
+
+#### Docker Compose 설정
 ```yaml
 # docker-compose.yml
 version: '3.8'
 
 services:
+  # CA 및 인증서 관리 서비스
+  ca-manager:
+    build: ./ca-manager
+    volumes:
+      - ./ca:/app/ca
+      - ./certs:/app/certs
+    networks:
+      - securepay-network
+
   # API Gateway
   api-gateway:
     image: nginx:alpine
     ports:
       - "443:443"
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./shared/certificates:/etc/nginx/ssl
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs/api-gateway-cert.pem:/etc/ssl/certs/api-gateway-cert.pem:ro
+      - ./certs/api-gateway-key.pem:/etc/ssl/private/api-gateway-key.pem:ro
+      - ./ca/certs/securepay-root-ca.crt:/etc/ssl/certs/securepay-root-ca.crt:ro
     depends_on:
       - user-service
-      - product-service
-      - order-service
       - payment-service
       - notification-service
+    networks:
+      - securepay-network
 
-  # 사용자 서비스
+  # User Service
   user-service:
-    build: ./services/user-service
-    ports:
-      - "3001:3001"
+    build: ./user-service
     volumes:
-      - ./shared/certificates:/app/certificates
+      - ./certs/user-service-cert.pem:/etc/ssl/certs/user-service-cert.pem:ro
+      - ./certs/user-service-key.pem:/etc/ssl/private/user-service-key.pem:ro
+      - ./ca/certs/securepay-root-ca.crt:/etc/ssl/certs/securepay-root-ca.crt:ro
     environment:
       - NODE_ENV=development
-      - PORT=3001
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/userdb
+      - SSL_CERT_PATH=/etc/ssl/certs/user-service-cert.pem
+      - SSL_KEY_PATH=/etc/ssl/private/user-service-key.pem
+      - CA_CERT_PATH=/etc/ssl/certs/securepay-root-ca.crt
+    networks:
+      - securepay-network
 
-  # 상품 서비스
-  product-service:
-    build: ./services/product-service
-    ports:
-      - "3002:3002"
-    volumes:
-      - ./shared/certificates:/app/certificates
-    environment:
-      - NODE_ENV=development
-      - PORT=3002
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/productdb
-
-  # 주문 서비스
-  order-service:
-    build: ./services/order-service
-    ports:
-      - "3003:3003"
-    volumes:
-      - ./shared/certificates:/app/certificates
-    environment:
-      - NODE_ENV=development
-      - PORT=3003
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/orderdb
-
-  # 결제 서비스
+  # Payment Service
   payment-service:
-    build: ./services/payment-service
-    ports:
-      - "3004:3004"
+    build: ./payment-service
     volumes:
-      - ./shared/certificates:/app/certificates
+      - ./certs/payment-service-cert.pem:/etc/ssl/certs/payment-service-cert.pem:ro
+      - ./certs/payment-service-key.pem:/etc/ssl/private/payment-service-key.pem:ro
+      - ./ca/certs/securepay-root-ca.crt:/etc/ssl/certs/securepay-root-ca.crt:ro
     environment:
       - NODE_ENV=development
-      - PORT=3004
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/paymentdb
+      - SSL_CERT_PATH=/etc/ssl/certs/payment-service-cert.pem
+      - SSL_KEY_PATH=/etc/ssl/private/payment-service-key.pem
+      - CA_CERT_PATH=/etc/ssl/certs/securepay-root-ca.crt
+    networks:
+      - securepay-network
 
-  # 알림 서비스
+  # Notification Service
   notification-service:
-    build: ./services/notification-service
-    ports:
-      - "3005:3005"
+    build: ./notification-service
     volumes:
-      - ./shared/certificates:/app/certificates
+      - ./certs/notification-service-cert.pem:/etc/ssl/certs/notification-service-cert.pem:ro
+      - ./certs/notification-service-key.pem:/etc/ssl/private/notification-service-key.pem:ro
+      - ./ca/certs/securepay-root-ca.crt:/etc/ssl/certs/securepay-root-ca.crt:ro
     environment:
       - NODE_ENV=development
-      - PORT=3005
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/notificationdb
+      - SSL_CERT_PATH=/etc/ssl/certs/notification-service-cert.pem
+      - SSL_KEY_PATH=/etc/ssl/private/notification-service-key.pem
+      - CA_CERT_PATH=/etc/ssl/certs/securepay-root-ca.crt
+    networks:
+      - securepay-network
 
-  # 데이터베이스
+  # 개발용 데이터베이스
   postgres:
-    image: postgres:15
+    image: postgres:13
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=userdb
+      - POSTGRES_DB=securepay_dev
+      - POSTGRES_USER=securepay
+      - POSTGRES_PASSWORD=dev_password_123
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./shared/certificates:/etc/ssl/certs
-    ports:
-      - "5432:5432"
+    networks:
+      - securepay-network
+
+networks:
+  securepay-network:
+    driver: bridge
 
 volumes:
   postgres_data:
 ```
 
-#### 6단계: 테스트 및 검증
+#### 자동화된 인증서 생성 스크립트
 ```bash
-# 서비스 시작
-docker-compose up -d
+#!/bin/bash
+# generate-service-certs.sh - 서비스별 인증서 자동 생성
 
-# API Gateway 테스트
-curl -k https://api-gateway.localhost/api/users/health
+SERVICES=("api-gateway" "user-service" "payment-service" "notification-service")
 
-# 개별 서비스 테스트
-curl -k https://user-service.localhost:3001/health
-curl -k https://product-service.localhost:3002/health
-curl -k https://order-service.localhost:3003/health
+echo "🔐 SecurePay 서비스 인증서 생성 시작..."
+
+for service in "${SERVICES[@]}"; do
+    echo "📋 $service 인증서 생성 중..."
+    
+    # 서비스별 개인키 생성
+    openssl genrsa -out "certs/${service}-key.pem" 4096
+    
+    # 서비스별 CSR 생성
+    openssl req -new -key "certs/${service}-key.pem" \
+        -out "certs/${service}.csr" \
+        -subj "/C=KR/ST=Seoul/L=Seoul/O=SecurePay/OU=Services/CN=${service}.securepay.local"
+    
+    # 서비스별 인증서 서명
+    openssl ca -config ca/ca.conf -extensions server_cert -days 365 \
+        -notext -md sha256 -in "certs/${service}.csr" \
+        -out "certs/${service}-cert.pem"
+    
+    echo "✅ $service 인증서 생성 완료"
+done
+
+echo "🎉 모든 서비스 인증서 생성 완료!"
+echo ""
+echo "📁 생성된 파일들:"
+for service in "${SERVICES[@]}"; do
+    echo "  - $service 인증서: certs/${service}-cert.pem"
+    echo "  - $service 개인키: certs/${service}-key.pem"
+done
 ```
 
-## 🏭 시나리오 2: IoT 디바이스 시뮬레이션
+### 5단계: 모바일 앱 개발 환경 통합
 
-### 상황 설명
-**회사**: 스마트홈 제품 개발사  
-**팀**: IoT 개발팀 (3명)  
-**프로젝트**: 스마트홈 디바이스 관리 시스템  
-**문제**: 다양한 IoT 디바이스와의 안전한 통신을 위한 인증서 관리
+#### iOS 앱 네트워킹 설정
+```swift
+// NetworkManager.swift
+import Foundation
+import Network
 
-### IoT 아키텍처 다이어그램
-
-```mermaid
-graph TB
-    A[IoT Hub] --> B[Smart Thermostat]
-    A --> C[Smart Light]
-    A --> D[Smart Door Lock]
-    A --> E[Security Camera]
-    A --> F[Smart Speaker]
+class SecurePayNetworkManager {
+    private let session: URLSession
     
-    G[Mobile App] --> A
-    H[Web Dashboard] --> A
-    
-    A --> I[Cloud API]
-    I --> J[Database]
-    I --> K[Analytics Service]
-    
-    subgraph "스마트홈 디바이스"
-        B
-        C
-        D
-        E
-        F
-    end
-    
-    subgraph "관리 시스템"
-        A
-        I
-        J
-        K
-    end
-    
-    subgraph "사용자 인터페이스"
-        G
-        H
-    end
-```
-
-### 실습 단계
-
-#### 1단계: IoT Hub 서버 구현
-```javascript
-// iot-hub/server.js
-const express = require('express');
-const https = require('https');
-const fs = require('fs');
-const WebSocket = require('ws');
-const cors = require('cors');
-
-const app = express();
-const PORT = 8443;
-
-// 미들웨어 설정
-app.use(cors({
-    origin: ['https://localhost', 'https://127.0.0.1'],
-    credentials: true
-}));
-app.use(express.json());
-
-// 디바이스 등록 및 상태 관리
-const devices = new Map();
-const deviceTypes = {
-    'thermostat': { name: '스마트 온도조절기', status: 'online' },
-    'light': { name: '스마트 조명', status: 'online' },
-    'doorlock': { name: '스마트 도어락', status: 'online' },
-    'camera': { name: '보안 카메라', status: 'online' },
-    'speaker': { name: '스마트 스피커', status: 'online' }
-};
-
-// 디바이스 등록 API
-app.post('/api/devices/register', (req, res) => {
-    const { deviceId, deviceType, location, capabilities } = req.body;
-    
-    if (!deviceTypes[deviceType]) {
-        return res.status(400).json({ error: '지원되지 않는 디바이스 타입입니다.' });
+    init() {
+        // 개발 환경용 SSL 설정
+        let config = URLSessionConfiguration.default
+        
+        // 개발 서버 인증서 검증 설정
+        config.urlSessionDelegate = self
+        
+        self.session = URLSession(configuration: config)
     }
     
-    const device = {
-        id: deviceId,
-        type: deviceType,
-        name: deviceTypes[deviceType].name,
-        location,
-        capabilities,
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        registeredAt: new Date().toISOString()
-    };
-    
-    devices.set(deviceId, device);
-    
-    console.log(`📱 디바이스 등록: ${device.name} (${deviceId})`);
-    
-    res.json({
-        success: true,
-        device,
-        message: '디바이스가 성공적으로 등록되었습니다.'
-    });
-});
-
-// 디바이스 상태 업데이트
-app.put('/api/devices/:deviceId/status', (req, res) => {
-    const { deviceId } = req.params;
-    const { status, data } = req.body;
-    
-    if (!devices.has(deviceId)) {
-        return res.status(404).json({ error: '디바이스를 찾을 수 없습니다.' });
-    }
-    
-    const device = devices.get(deviceId);
-    device.status = status;
-    device.lastSeen = new Date().toISOString();
-    device.data = data;
-    
-    devices.set(deviceId, device);
-    
-    console.log(`📊 디바이스 상태 업데이트: ${device.name} - ${status}`);
-    
-    res.json({ success: true, device });
-});
-
-// 디바이스 제어
-app.post('/api/devices/:deviceId/control', (req, res) => {
-    const { deviceId } = req.params;
-    const { action, parameters } = req.body;
-    
-    if (!devices.has(deviceId)) {
-        return res.status(404).json({ error: '디바이스를 찾을 수 없습니다.' });
-    }
-    
-    const device = devices.get(deviceId);
-    
-    console.log(`🎮 디바이스 제어: ${device.name} - ${action}`, parameters);
-    
-    // 실제 디바이스 제어 로직 (시뮬레이션)
-    const result = {
-        success: true,
-        deviceId,
-        action,
-        parameters,
-        timestamp: new Date().toISOString(),
-        response: `디바이스 ${device.name}에서 ${action} 명령이 실행되었습니다.`
-    };
-    
-    res.json(result);
-});
-
-// 디바이스 목록 조회
-app.get('/api/devices', (req, res) => {
-    const deviceList = Array.from(devices.values());
-    res.json({
-        devices: deviceList,
-        total: deviceList.length,
-        online: deviceList.filter(d => d.status === 'online').length
-    });
-});
-
-// 디바이스 상세 정보
-app.get('/api/devices/:deviceId', (req, res) => {
-    const { deviceId } = req.params;
-    
-    if (!devices.has(deviceId)) {
-        return res.status(404).json({ error: '디바이스를 찾을 수 없습니다.' });
-    }
-    
-    res.json(devices.get(deviceId));
-});
-
-// HTTPS 서버 설정
-const options = {
-    key: fs.readFileSync('iot-hub.localhost-key.pem'),
-    cert: fs.readFileSync('iot-hub.localhost.pem')
-};
-
-const server = https.createServer(options, app);
-
-// WebSocket 서버 설정 (실시간 통신)
-const wss = new WebSocket.Server({ server });
-
-wss.on('connection', (ws) => {
-    console.log('🔌 WebSocket 연결됨');
-    
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
-            console.log('📨 WebSocket 메시지 수신:', data);
-            
-            // 디바이스 데이터 브로드캐스트
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({
-                        type: 'device_update',
-                        data,
-                        timestamp: new Date().toISOString()
-                    }));
-                }
-            });
-        } catch (error) {
-            console.error('WebSocket 메시지 파싱 오류:', error);
+    func fetchUsers() async throws -> [User] {
+        let url = URL(string: "https://api-dev.securepay.local/api/users")!
+        
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NetworkError.invalidResponse
         }
-    });
-    
-    ws.on('close', () => {
-        console.log('🔌 WebSocket 연결 종료');
-    });
-});
-
-server.listen(PORT, () => {
-    console.log(`🏠 IoT Hub가 https://iot-hub.localhost:${PORT}에서 실행 중입니다.`);
-});
-```
-
-#### 2단계: 스마트 디바이스 시뮬레이터
-```javascript
-// device-simulator/thermostat.js
-const https = require('https');
-const fs = require('fs');
-
-class SmartThermostat {
-    constructor(deviceId, hubUrl) {
-        this.deviceId = deviceId;
-        this.hubUrl = hubUrl;
-        this.temperature = 22;
-        this.targetTemperature = 22;
-        this.mode = 'auto'; // auto, heat, cool, off
-        this.status = 'online';
+        
+        return try JSONDecoder().decode([User].self, from: data)
     }
     
-    // IoT Hub에 디바이스 등록
-    async register() {
-        const deviceData = {
-            deviceId: this.deviceId,
-            deviceType: 'thermostat',
-            location: '거실',
-            capabilities: ['temperature_control', 'mode_control', 'schedule']
-        };
+    func processPayment(from userId: Int, to targetUserId: Int, amount: Int) async throws -> PaymentResult {
+        let url = URL(string: "https://api-dev.securepay.local/api/payments")!
         
-        try {
-            const response = await this.makeRequest('POST', '/api/devices/register', deviceData);
-            console.log('✅ 온도조절기 등록 완료:', response.device.name);
-            return response;
-        } catch (error) {
-            console.error('❌ 디바이스 등록 실패:', error.message);
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let paymentData = PaymentRequest(fromUserId: userId, toUserId: targetUserId, amount: amount)
+        request.httpBody = try JSONEncoder().encode(paymentData)
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NetworkError.paymentFailed
         }
-    }
-    
-    // 상태 업데이트
-    async updateStatus() {
-        const statusData = {
-            status: this.status,
-            data: {
-                temperature: this.temperature,
-                targetTemperature: this.targetTemperature,
-                mode: this.mode,
-                humidity: 45 + Math.random() * 10
-            }
-        };
         
-        try {
-            await this.makeRequest('PUT', `/api/devices/${this.deviceId}/status`, statusData);
-            console.log(`🌡️ 온도조절기 상태 업데이트: ${this.temperature}°C (목표: ${this.targetTemperature}°C)`);
-        } catch (error) {
-            console.error('❌ 상태 업데이트 실패:', error.message);
-        }
-    }
-    
-    // 온도 조절
-    setTemperature(targetTemp) {
-        this.targetTemperature = targetTemp;
-        console.log(`🎯 목표 온도 설정: ${targetTemp}°C`);
-        this.updateStatus();
-    }
-    
-    // 모드 변경
-    setMode(mode) {
-        this.mode = mode;
-        console.log(`🔄 모드 변경: ${mode}`);
-        this.updateStatus();
-    }
-    
-    // HTTP 요청 헬퍼
-    makeRequest(method, path, data = null) {
-        return new Promise((resolve, reject) => {
-            const options = {
-                hostname: 'iot-hub.localhost',
-                port: 8443,
-                path: path,
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                rejectUnauthorized: false // 개발 환경에서만 사용
-            };
-            
-            const req = https.request(options, (res) => {
-                let responseData = '';
-                
-                res.on('data', (chunk) => {
-                    responseData += chunk;
-                });
-                
-                res.on('end', () => {
-                    try {
-                        const result = JSON.parse(responseData);
-                        resolve(result);
-                    } catch (error) {
-                        reject(new Error('응답 파싱 실패'));
-                    }
-                });
-            });
-            
-            req.on('error', (error) => {
-                reject(error);
-            });
-            
-            if (data) {
-                req.write(JSON.stringify(data));
-            }
-            
-            req.end();
-        });
-    }
-    
-    // 시뮬레이션 시작
-    startSimulation() {
-        console.log('🏠 스마트 온도조절기 시뮬레이션 시작');
-        
-        // 초기 등록
-        this.register();
-        
-        // 주기적 상태 업데이트 (30초마다)
-        setInterval(() => {
-            // 온도 변화 시뮬레이션
-            const change = (Math.random() - 0.5) * 0.5;
-            this.temperature += change;
-            
-            // 목표 온도에 따라 자동 조절
-            if (this.mode === 'auto') {
-                if (this.temperature < this.targetTemperature - 1) {
-                    console.log('🔥 난방 가동');
-                } else if (this.temperature > this.targetTemperature + 1) {
-                    console.log('❄️ 냉방 가동');
-                }
-            }
-            
-            this.updateStatus();
-        }, 30000);
-        
-        // 사용자 명령 시뮬레이션 (1분마다)
-        setInterval(() => {
-            const commands = [
-                () => this.setTemperature(20 + Math.floor(Math.random() * 10)),
-                () => this.setMode(['auto', 'heat', 'cool', 'off'][Math.floor(Math.random() * 4)])
-            ];
-            
-            const randomCommand = commands[Math.floor(Math.random() * commands.length)];
-            randomCommand();
-        }, 60000);
+        return try JSONDecoder().decode(PaymentResult.self, from: data)
     }
 }
 
-// 시뮬레이터 실행
-const thermostat = new SmartThermostat('thermostat-001', 'https://iot-hub.localhost:8443');
-thermostat.startSimulation();
-```
-
-#### 3단계: 웹 대시보드 구현
-```html
-<!-- dashboard/index.html -->
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트홈 대시보드</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .device-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .device-status { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; }
-        .status-online { background: #28a745; }
-        .status-offline { background: #dc3545; }
-        .control-panel { margin-top: 15px; }
-        .control-button { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 5px; }
-        .control-button:hover { background: #0056b3; }
-        .temperature-display { font-size: 24px; font-weight: bold; color: #007bff; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🏠 스마트홈 대시보드</h1>
-            <p>실시간 디바이스 모니터링 및 제어</p>
-        </div>
+// MARK: - URLSessionDelegate
+extension SecurePayNetworkManager: URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         
-        <div class="device-grid" id="deviceGrid">
-            <!-- 디바이스 카드들이 여기에 동적으로 추가됩니다 -->
-        </div>
-    </div>
-    
-    <script>
-        class SmartHomeDashboard {
-            constructor() {
-                this.devices = [];
-                this.ws = null;
-                this.init();
-            }
-            
-            async init() {
-                await this.loadDevices();
-                this.connectWebSocket();
-                this.startAutoRefresh();
-            }
-            
-            async loadDevices() {
-                try {
-                    const response = await fetch('https://iot-hub.localhost:8443/api/devices', {
-                        method: 'GET',
-                        mode: 'cors'
-                    });
-                    const data = await response.json();
-                    this.devices = data.devices;
-                    this.renderDevices();
-                } catch (error) {
-                    console.error('디바이스 로드 실패:', error);
-                }
-            }
-            
-            renderDevices() {
-                const grid = document.getElementById('deviceGrid');
-                grid.innerHTML = '';
-                
-                this.devices.forEach(device => {
-                    const card = this.createDeviceCard(device);
-                    grid.appendChild(card);
-                });
-            }
-            
-            createDeviceCard(device) {
-                const card = document.createElement('div');
-                card.className = 'device-card';
-                card.innerHTML = `
-                    <h3>${device.name}</h3>
-                    <p><strong>위치:</strong> ${device.location}</p>
-                    <p><strong>상태:</strong> <span class="device-status status-${device.status}">${device.status}</span></p>
-                    <p><strong>마지막 연결:</strong> ${new Date(device.lastSeen).toLocaleString()}</p>
-                    ${this.createDeviceControls(device)}
-                `;
-                return card;
-            }
-            
-            createDeviceControls(device) {
-                if (device.type === 'thermostat') {
-                    return `
-                        <div class="control-panel">
-                            <div class="temperature-display">${device.data?.temperature || 'N/A'}°C</div>
-                            <p>목표 온도: ${device.data?.targetTemperature || 'N/A'}°C</p>
-                            <button class="control-button" onclick="dashboard.setTemperature('${device.id}', 20)">20°C</button>
-                            <button class="control-button" onclick="dashboard.setTemperature('${device.id}', 22)">22°C</button>
-                            <button class="control-button" onclick="dashboard.setTemperature('${device.id}', 24)">24°C</button>
-                        </div>
-                    `;
-                } else if (device.type === 'light') {
-                    return `
-                        <div class="control-panel">
-                            <button class="control-button" onclick="dashboard.controlDevice('${device.id}', 'turn_on')">켜기</button>
-                            <button class="control-button" onclick="dashboard.controlDevice('${device.id}', 'turn_off')">끄기</button>
-                        </div>
-                    `;
-                }
-                return '';
-            }
-            
-            async setTemperature(deviceId, temperature) {
-                try {
-                    const response = await fetch(`https://iot-hub.localhost:8443/api/devices/${deviceId}/control`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            action: 'set_temperature',
-                            parameters: { temperature: parseInt(temperature) }
-                        }),
-                        mode: 'cors'
-                    });
-                    const result = await response.json();
-                    console.log('온도 설정 결과:', result);
-                    this.loadDevices(); // 디바이스 목록 새로고침
-                } catch (error) {
-                    console.error('온도 설정 실패:', error);
-                }
-            }
-            
-            async controlDevice(deviceId, action) {
-                try {
-                    const response = await fetch(`https://iot-hub.localhost:8443/api/devices/${deviceId}/control`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action, parameters: {} }),
-                        mode: 'cors'
-                    });
-                    const result = await response.json();
-                    console.log('디바이스 제어 결과:', result);
-                    this.loadDevices(); // 디바이스 목록 새로고침
-                } catch (error) {
-                    console.error('디바이스 제어 실패:', error);
-                }
-            }
-            
-            connectWebSocket() {
-                try {
-                    this.ws = new WebSocket('wss://iot-hub.localhost:8443');
-                    
-                    this.ws.onopen = () => {
-                        console.log('WebSocket 연결됨');
-                    };
-                    
-                    this.ws.onmessage = (event) => {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'device_update') {
-                            console.log('디바이스 업데이트:', data);
-                            this.loadDevices(); // 디바이스 목록 새로고침
-                        }
-                    };
-                    
-                    this.ws.onclose = () => {
-                        console.log('WebSocket 연결 종료');
-                        // 5초 후 재연결 시도
-                        setTimeout(() => this.connectWebSocket(), 5000);
-                    };
-                } catch (error) {
-                    console.error('WebSocket 연결 실패:', error);
-                }
-            }
-            
-            startAutoRefresh() {
-                // 30초마다 디바이스 목록 새로고침
-                setInterval(() => {
-                    this.loadDevices();
-                }, 30000);
-            }
+        // 개발 환경에서는 자체 서명 인증서 허용
+        if challenge.protectionSpace.host.contains("securepay.local") {
+            // 개발 서버의 인증서를 신뢰
+            let credential = URLCredential(trust: challenge.protectionSpace.serverTrust!)
+            completionHandler(.useCredential, credential)
+        } else {
+            // 프로덕션 환경에서는 기본 검증 사용
+            completionHandler(.performDefaultHandling, nil)
         }
-        
-        // 대시보드 초기화
-        const dashboard = new SmartHomeDashboard();
-    </script>
-</body>
-</html>
-```
-
-## 🏥 시나리오 3: 의료기기 통신 시스템
-
-### 상황 설명
-**회사**: 의료기기 제조사  
-**팀**: 의료기기 개발팀 (4명)  
-**프로젝트**: 병원 내 의료기기 통합 관리 시스템  
-**문제**: 환자 데이터 보호를 위한 강력한 암호화 통신 필요
-
-### 의료기기 아키텍처 다이어그램
-
-```mermaid
-graph TB
-    A[의료기기 게이트웨이] --> B[심전도 모니터]
-    A --> C[혈압계]
-    A --> D[산소포화도 측정기]
-    A --> E[인슐린 펌프]
-    A --> F[체온계]
-    
-    G[의료진 태블릿] --> A
-    H[간호사 스테이션] --> A
-    
-    A --> I[병원 정보 시스템]
-    I --> J[환자 데이터베이스]
-    I --> K[의료진 포털]
-    
-    subgraph "의료기기"
-        B
-        C
-        D
-        E
-        F
-    end
-    
-    subgraph "관리 시스템"
-        A
-        I
-        J
-        K
-    end
-    
-    subgraph "사용자 인터페이스"
-        G
-        H
-    end
-```
-
-### 실습 단계
-
-#### 1단계: 의료기기 게이트웨이 구현
-```javascript
-// medical-gateway/server.js
-const express = require('express');
-const https = require('https');
-const fs = require('fs');
-const crypto = require('crypto');
-const cors = require('cors');
-
-const app = express();
-const PORT = 8443;
-
-// 미들웨어 설정
-app.use(cors({
-    origin: ['https://localhost', 'https://127.0.0.1'],
-    credentials: true
-}));
-app.use(express.json());
-
-// 의료기기 등록 및 데이터 관리
-const medicalDevices = new Map();
-const patientData = new Map();
-
-// 의료기기 등록
-app.post('/api/devices/register', (req, res) => {
-    const { deviceId, deviceType, patientId, location, capabilities } = req.body;
-    
-    const device = {
-        id: deviceId,
-        type: deviceType,
-        patientId,
-        location,
-        capabilities,
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        registeredAt: new Date().toISOString(),
-        encryptionKey: crypto.randomBytes(32).toString('hex') // 디바이스별 암호화 키
-    };
-    
-    medicalDevices.set(deviceId, device);
-    
-    console.log(`🏥 의료기기 등록: ${deviceType} (환자: ${patientId})`);
-    
-    res.json({
-        success: true,
-        device,
-        encryptionKey: device.encryptionKey
-    });
-});
-
-// 의료 데이터 수신 (암호화된 데이터)
-app.post('/api/devices/:deviceId/data', (req, res) => {
-    const { deviceId } = req.params;
-    const { encryptedData, timestamp } = req.body;
-    
-    if (!medicalDevices.has(deviceId)) {
-        return res.status(404).json({ error: '의료기기를 찾을 수 없습니다.' });
-    }
-    
-    const device = medicalDevices.get(deviceId);
-    
-    try {
-        // 데이터 복호화 (실제로는 더 강력한 암호화 사용)
-        const decryptedData = this.decryptData(encryptedData, device.encryptionKey);
-        
-        // 환자 데이터 저장
-        if (!patientData.has(device.patientId)) {
-            patientData.set(device.patientId, []);
-        }
-        
-        const patientRecord = {
-            deviceId,
-            deviceType: device.type,
-            data: decryptedData,
-            timestamp: timestamp || new Date().toISOString(),
-            receivedAt: new Date().toISOString()
-        };
-        
-        patientData.get(device.patientId).push(patientRecord);
-        
-        console.log(`📊 의료 데이터 수신: ${device.type} - 환자 ${device.patientId}`);
-        
-        res.json({
-            success: true,
-            message: '의료 데이터가 성공적으로 저장되었습니다.'
-        });
-        
-    } catch (error) {
-        console.error('데이터 복호화 실패:', error);
-        res.status(400).json({ error: '데이터 복호화에 실패했습니다.' });
-    }
-});
-
-// 환자 데이터 조회 (의료진만 접근 가능)
-app.get('/api/patients/:patientId/data', (req, res) => {
-    const { patientId } = req.params;
-    const { deviceType, startDate, endDate } = req.query;
-    
-    if (!patientData.has(patientId)) {
-        return res.status(404).json({ error: '환자 데이터를 찾을 수 없습니다.' });
-    }
-    
-    let data = patientData.get(patientId);
-    
-    // 필터링
-    if (deviceType) {
-        data = data.filter(record => record.deviceType === deviceType);
-    }
-    
-    if (startDate) {
-        data = data.filter(record => new Date(record.timestamp) >= new Date(startDate));
-    }
-    
-    if (endDate) {
-        data = data.filter(record => new Date(record.timestamp) <= new Date(endDate));
-    }
-    
-    // 최신 데이터부터 정렬
-    data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    res.json({
-        patientId,
-        data,
-        total: data.length,
-        retrievedAt: new Date().toISOString()
-    });
-});
-
-// 의료기기 상태 모니터링
-app.get('/api/devices/status', (req, res) => {
-    const deviceList = Array.from(medicalDevices.values());
-    const onlineDevices = deviceList.filter(d => d.status === 'online');
-    const offlineDevices = deviceList.filter(d => d.status === 'offline');
-    
-    res.json({
-        total: deviceList.length,
-        online: onlineDevices.length,
-        offline: offlineDevices.length,
-        devices: deviceList
-    });
-});
-
-// 데이터 암호화 함수
-encryptData(data, key) {
-    const cipher = crypto.createCipher('aes-256-cbc', key);
-    let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
-}
-
-// 데이터 복호화 함수
-decryptData(encryptedData, key) {
-    const decipher = crypto.createDecipher('aes-256-cbc', key);
-    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return JSON.parse(decrypted);
-}
-
-// HTTPS 서버 설정
-const options = {
-    key: fs.readFileSync('medical-gateway.localhost-key.pem'),
-    cert: fs.readFileSync('medical-gateway.localhost.pem')
-};
-
-https.createServer(options, app).listen(PORT, () => {
-    console.log(`🏥 의료기기 게이트웨이가 https://medical-gateway.localhost:${PORT}에서 실행 중입니다.`);
-});
-```
-
-#### 2단계: 심전도 모니터 시뮬레이터
-```javascript
-// device-simulator/ecg-monitor.js
-const https = require('https');
-const crypto = require('crypto');
-
-class ECGMonitor {
-    constructor(deviceId, patientId, gatewayUrl) {
-        this.deviceId = deviceId;
-        this.patientId = patientId;
-        this.gatewayUrl = gatewayUrl;
-        this.encryptionKey = null;
-        this.isRunning = false;
-        this.heartRate = 72; // 기본 심박수
-    }
-    
-    // 의료기기 등록
-    async register() {
-        const deviceData = {
-            deviceId: this.deviceId,
-            deviceType: 'ecg_monitor',
-            patientId: this.patientId,
-            location: '병실 101',
-            capabilities: ['heart_rate_monitoring', 'ecg_recording', 'alarm_system']
-        };
-        
-        try {
-            const response = await this.makeRequest('POST', '/api/devices/register', deviceData);
-            this.encryptionKey = response.encryptionKey;
-            console.log('✅ 심전도 모니터 등록 완료');
-            return response;
-        } catch (error) {
-            console.error('❌ 의료기기 등록 실패:', error.message);
-        }
-    }
-    
-    // 심전도 데이터 생성 (시뮬레이션)
-    generateECGData() {
-        const timestamp = new Date().toISOString();
-        const baseRate = this.heartRate;
-        const variation = (Math.random() - 0.5) * 10; // ±5 BPM 변동
-        const currentRate = Math.max(40, Math.min(200, baseRate + variation));
-        
-        // 심전도 파형 데이터 생성 (간단한 시뮬레이션)
-        const ecgWaveform = [];
-        for (let i = 0; i < 100; i++) {
-            const time = i * 0.01; // 10ms 간격
-            const wave = Math.sin(2 * Math.PI * currentRate / 60 * time) * 0.5 + 
-                        Math.sin(2 * Math.PI * currentRate / 30 * time) * 0.3 +
-                        (Math.random() - 0.5) * 0.1; // 노이즈
-            ecgWaveform.push(wave);
-        }
-        
-        return {
-            heartRate: Math.round(currentRate),
-            ecgWaveform,
-            timestamp,
-            quality: Math.random() > 0.1 ? 'good' : 'poor', // 90% 양질
-            alarm: currentRate > 120 || currentRate < 50 ? 'high' : 'normal'
-        };
-    }
-    
-    // 데이터 전송
-    async sendData() {
-        if (!this.encryptionKey) {
-            console.error('암호화 키가 없습니다.');
-            return;
-        }
-        
-        const data = this.generateECGData();
-        const encryptedData = this.encryptData(data, this.encryptionKey);
-        
-        try {
-            await this.makeRequest('POST', `/api/devices/${this.deviceId}/data`, {
-                encryptedData,
-                timestamp: data.timestamp
-            });
-            
-            console.log(`💓 심전도 데이터 전송: 심박수 ${data.heartRate} BPM (알람: ${data.alarm})`);
-            
-            // 알람 상태 확인
-            if (data.alarm === 'high') {
-                console.log('🚨 심박수 이상 감지! 의료진에게 알림 필요');
-            }
-            
-        } catch (error) {
-            console.error('❌ 데이터 전송 실패:', error.message);
-        }
-    }
-    
-    // 데이터 암호화
-    encryptData(data, key) {
-        const cipher = crypto.createCipher('aes-256-cbc', key);
-        let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
-        encrypted += cipher.final('hex');
-        return encrypted;
-    }
-    
-    // HTTP 요청 헬퍼
-    makeRequest(method, path, data = null) {
-        return new Promise((resolve, reject) => {
-            const options = {
-                hostname: 'medical-gateway.localhost',
-                port: 8443,
-                path: path,
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                rejectUnauthorized: false
-            };
-            
-            const req = https.request(options, (res) => {
-                let responseData = '';
-                
-                res.on('data', (chunk) => {
-                    responseData += chunk;
-                });
-                
-                res.on('end', () => {
-                    try {
-                        const result = JSON.parse(responseData);
-                        resolve(result);
-                    } catch (error) {
-                        reject(new Error('응답 파싱 실패'));
-                    }
-                });
-            });
-            
-            req.on('error', (error) => {
-                reject(error);
-            });
-            
-            if (data) {
-                req.write(JSON.stringify(data));
-            }
-            
-            req.end();
-        });
-    }
-    
-    // 모니터링 시작
-    startMonitoring() {
-        console.log('🏥 심전도 모니터 시뮬레이션 시작');
-        
-        // 초기 등록
-        this.register();
-        
-        // 5초마다 데이터 전송
-        setInterval(() => {
-            this.sendData();
-        }, 5000);
-        
-        // 심박수 변화 시뮬레이션 (30초마다)
-        setInterval(() => {
-            const change = (Math.random() - 0.5) * 20;
-            this.heartRate = Math.max(40, Math.min(200, this.heartRate + change));
-            console.log(`💓 심박수 변화: ${this.heartRate} BPM`);
-        }, 30000);
     }
 }
 
-// 시뮬레이터 실행
-const ecgMonitor = new ECGMonitor('ecg-001', 'patient-001', 'https://medical-gateway.localhost:8443');
-ecgMonitor.startMonitoring();
+// MARK: - Data Models
+struct User: Codable {
+    let id: Int
+    let name: String
+    let email: String
+    let balance: Int
+}
+
+struct PaymentRequest: Codable {
+    let fromUserId: Int
+    let toUserId: Int
+    let amount: Int
+}
+
+struct PaymentResult: Codable {
+    let success: Bool
+    let transactionId: String?
+    let message: String
+}
+
+enum NetworkError: Error {
+    case invalidResponse
+    case paymentFailed
+    case networkUnavailable
+}
 ```
 
-#### 3단계: 의료진 대시보드
-```html
-<!-- medical-dashboard/index.html -->
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>의료진 대시보드</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .header { background: #dc3545; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .patient-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .patient-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #dc3545; }
-        .vital-signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
-        .vital-item { text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px; }
-        .vital-value { font-size: 24px; font-weight: bold; color: #dc3545; }
-        .vital-label { font-size: 12px; color: #666; }
-        .alarm { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin-top: 10px; }
-        .alarm-high { background: #f8d7da; border-color: #f5c6cb; }
-        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-        .status-online { background: #28a745; }
-        .status-offline { background: #dc3545; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🏥 의료진 대시보드</h1>
-            <p>실시간 환자 모니터링 및 의료기기 관리</p>
-        </div>
+#### Android 앱 네트워킹 설정
+```kotlin
+// SecurePayApiClient.kt
+import okhttp3.*
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.security.cert.X509Certificate
+import javax.net.ssl.*
+
+class SecurePayApiClient {
+    companion object {
+        private const val BASE_URL = "https://api-dev.securepay.local/"
         
-        <div class="patient-grid" id="patientGrid">
-            <!-- 환자 카드들이 여기에 동적으로 추가됩니다 -->
-        </div>
-    </div>
-    
-    <script>
-        class MedicalDashboard {
-            constructor() {
-                this.patients = new Map();
-                this.devices = new Map();
-                this.init();
-            }
+        fun create(): SecurePayApi {
+            val client = OkHttpClient.Builder()
+                .sslSocketFactory(createSSLSocketFactory(), createTrustManager())
+                .hostnameVerifier { hostname, session -> true } // 개발 환경용
+                .addInterceptor(createLoggingInterceptor())
+                .build()
             
-            async init() {
-                await this.loadDevices();
-                await this.loadPatientData();
-                this.startAutoRefresh();
-            }
+            val retrofit = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
             
-            async loadDevices() {
-                try {
-                    const response = await fetch('https://medical-gateway.localhost:8443/api/devices/status', {
-                        method: 'GET',
-                        mode: 'cors'
-                    });
-                    const data = await response.json();
-                    
-                    data.devices.forEach(device => {
-                        this.devices.set(device.id, device);
-                    });
-                    
-                    console.log('의료기기 상태 로드 완료:', data);
-                } catch (error) {
-                    console.error('의료기기 상태 로드 실패:', error);
-                }
-            }
-            
-            async loadPatientData() {
-                // 실제로는 환자 목록을 먼저 가져와야 하지만, 시뮬레이션을 위해 하드코딩
-                const patientIds = ['patient-001'];
-                
-                for (const patientId of patientIds) {
-                    try {
-                        const response = await fetch(`https://medical-gateway.localhost:8443/api/patients/${patientId}/data`, {
-                            method: 'GET',
-                            mode: 'cors'
-                        });
-                        const data = await response.json();
-                        
-                        this.patients.set(patientId, {
-                            id: patientId,
-                            name: '홍길동',
-                            room: '101',
-                            data: data.data.slice(0, 10) // 최근 10개 데이터만
-                        });
-                        
-                    } catch (error) {
-                        console.error(`환자 ${patientId} 데이터 로드 실패:`, error);
-                    }
-                }
-                
-                this.renderPatients();
-            }
-            
-            renderPatients() {
-                const grid = document.getElementById('patientGrid');
-                grid.innerHTML = '';
-                
-                this.patients.forEach(patient => {
-                    const card = this.createPatientCard(patient);
-                    grid.appendChild(card);
-                });
-            }
-            
-            createPatientCard(patient) {
-                const latestData = patient.data[0];
-                const device = Array.from(this.devices.values()).find(d => d.patientId === patient.id);
-                
-                const card = document.createElement('div');
-                card.className = 'patient-card';
-                card.innerHTML = `
-                    <h3>👤 ${patient.name} (${patient.room}호)</h3>
-                    <p><strong>의료기기:</strong> 
-                        <span class="status-indicator status-${device?.status || 'offline'}"></span>
-                        ${device?.type || 'N/A'}
-                    </p>
-                    <p><strong>마지막 업데이트:</strong> ${latestData ? new Date(latestData.timestamp).toLocaleString() : 'N/A'}</p>
-                    
-                    ${latestData ? this.createVitalSignsDisplay(latestData.data) : '<p>데이터 없음</p>'}
-                    
-                    ${latestData?.data?.alarm === 'high' ? '<div class="alarm alarm-high">🚨 심박수 이상 감지!</div>' : ''}
-                `;
-                return card;
-            }
-            
-            createVitalSignsDisplay(data) {
-                return `
-                    <div class="vital-signs">
-                        <div class="vital-item">
-                            <div class="vital-value">${data.heartRate || 'N/A'}</div>
-                            <div class="vital-label">심박수 (BPM)</div>
-                        </div>
-                        <div class="vital-item">
-                            <div class="vital-value">${data.quality || 'N/A'}</div>
-                            <div class="vital-label">신호 품질</div>
-                        </div>
-                        <div class="vital-item">
-                            <div class="vital-value">${data.alarm || 'N/A'}</div>
-                            <div class="vital-label">알람 상태</div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            startAutoRefresh() {
-                // 10초마다 데이터 새로고침
-                setInterval(() => {
-                    this.loadDevices();
-                    this.loadPatientData();
-                }, 10000);
+            return retrofit.create(SecurePayApi::class.java)
+        }
+        
+        private fun createSSLSocketFactory(): SSLSocketFactory {
+            val trustManager = createTrustManager()
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, arrayOf(trustManager), null)
+            return sslContext.socketFactory
+        }
+        
+        private fun createTrustManager(): X509TrustManager {
+            return object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
             }
         }
         
-        // 대시보드 초기화
-        const dashboard = new MedicalDashboard();
-    </script>
-</body>
-</html>
+        private fun createLoggingInterceptor(): HttpLoggingInterceptor {
+            return HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            }
+        }
+    }
+}
+
+// API 인터페이스
+interface SecurePayApi {
+    @GET("api/users")
+    suspend fun getUsers(): List<User>
+    
+    @GET("api/users/{id}")
+    suspend fun getUser(@Path("id") userId: Int): User
+    
+    @POST("api/payments")
+    suspend fun processPayment(@Body request: PaymentRequest): PaymentResult
+}
+
+// 데이터 클래스
+data class User(
+    val id: Int,
+    val name: String,
+    val email: String,
+    val balance: Int
+)
+
+data class PaymentRequest(
+    val fromUserId: Int,
+    val toUserId: Int,
+    val amount: Int
+)
+
+data class PaymentResult(
+    val success: Boolean,
+    val transactionId: String?,
+    val message: String
+)
 ```
 
-## 🧪 시나리오 4: 실험실 장비 통합 시스템
+### 6단계: QA 자동화 테스트 환경 구축
 
-### 상황 설명
-**회사**: 바이오테크 연구소  
-**팀**: 연구개발팀 (6명)  
-**프로젝트**: 실험실 장비 데이터 수집 및 분석 시스템  
-**문제**: 다양한 실험 장비의 데이터를 안전하게 수집하고 분석
+#### Selenium 테스트 설정
+```python
+# test_secure_pay_api.py
+import pytest
+import requests
+import ssl
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-### 실험실 아키텍처 다이어그램
+class SecurePayTestSuite:
+    def __init__(self):
+        self.base_url = "https://api-dev.securepay.local"
+        self.driver = None
+        self.setup_ssl_context()
+    
+    def setup_ssl_context(self):
+        """개발 환경 SSL 컨텍스트 설정"""
+        # 자체 서명 인증서를 위한 SSL 컨텍스트
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # requests 세션에 SSL 컨텍스트 적용
+        self.session = requests.Session()
+        self.session.verify = False  # 개발 환경에서만 사용
+    
+    def setup_chrome_driver(self):
+        """Chrome 드라이버 설정"""
+        chrome_options = Options()
+        chrome_options.add_argument("--ignore-ssl-errors")
+        chrome_options.add_argument("--ignore-certificate-errors")
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--user-data-dir=/tmp/chrome_dev_test")
+        
+        self.driver = webdriver.Chrome(options=chrome_options)
+        self.driver.implicitly_wait(10)
+    
+    def test_api_connectivity(self):
+        """API 연결성 테스트"""
+        try:
+            response = self.session.get(f"{self.base_url}/api/users")
+            assert response.status_code == 200
+            users = response.json()
+            assert len(users) > 0
+            print("✅ API 연결성 테스트 통과")
+        except Exception as e:
+            print(f"❌ API 연결성 테스트 실패: {e}")
+            raise
+    
+    def test_user_authentication(self):
+        """사용자 인증 테스트"""
+        try:
+            # 사용자 목록 조회
+            response = self.session.get(f"{self.base_url}/api/users")
+            users = response.json()
+            
+            # 첫 번째 사용자 정보 조회
+            user_id = users[0]['id']
+            response = self.session.get(f"{self.base_url}/api/users/{user_id}")
+            user = response.json()
+            
+            assert user['id'] == user_id
+            assert 'name' in user
+            assert 'email' in user
+            assert 'balance' in user
+            
+            print("✅ 사용자 인증 테스트 통과")
+        except Exception as e:
+            print(f"❌ 사용자 인증 테스트 실패: {e}")
+            raise
+    
+    def test_payment_flow(self):
+        """결제 플로우 테스트"""
+        try:
+            # 사용자 목록 조회
+            response = self.session.get(f"{self.base_url}/api/users")
+            users = response.json()
+            
+            if len(users) >= 2:
+                from_user = users[0]
+                to_user = users[1]
+                amount = 10000
+                
+                # 결제 요청
+                payment_data = {
+                    "fromUserId": from_user['id'],
+                    "toUserId": to_user['id'],
+                    "amount": amount
+                }
+                
+                response = self.session.post(
+                    f"{self.base_url}/api/payments",
+                    json=payment_data
+                )
+                
+                result = response.json()
+                assert result['success'] == True
+                assert 'transactionId' in result
+                
+                print("✅ 결제 플로우 테스트 통과")
+            else:
+                print("⚠️ 결제 테스트를 위한 사용자가 부족합니다")
+        except Exception as e:
+            print(f"❌ 결제 플로우 테스트 실패: {e}")
+            raise
+    
+    def test_web_interface(self):
+        """웹 인터페이스 테스트"""
+        try:
+            self.setup_chrome_driver()
+            
+            # 웹 페이지 접속
+            self.driver.get("https://app-dev.securepay.local")
+            
+            # 페이지 로딩 대기
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+            
+            # SSL 인증서 경고가 없는지 확인
+            assert "Not Secure" not in self.driver.title
+            assert "Certificate Error" not in self.driver.page_source
+            
+            print("✅ 웹 인터페이스 테스트 통과")
+        except Exception as e:
+            print(f"❌ 웹 인터페이스 테스트 실패: {e}")
+            raise
+        finally:
+            if self.driver:
+                self.driver.quit()
+    
+    def run_all_tests(self):
+        """모든 테스트 실행"""
+        print("🧪 SecurePay QA 테스트 시작...")
+        print("=" * 50)
+        
+        try:
+            self.test_api_connectivity()
+            self.test_user_authentication()
+            self.test_payment_flow()
+            self.test_web_interface()
+            
+            print("=" * 50)
+            print("🎉 모든 테스트가 성공적으로 완료되었습니다!")
+            
+        except Exception as e:
+            print("=" * 50)
+            print(f"❌ 테스트 실패: {e}")
+            raise
 
-```mermaid
-graph TB
-    A[실험실 데이터 허브] --> B[현미경]
-    A --> C[분석기]
-    A --> D[온도조절기]
-    A --> E[pH 측정기]
-    A --> F[분광계]
-    
-    G[연구원 워크스테이션] --> A
-    H[데이터 분석 서버] --> A
-    
-    A --> I[클라우드 스토리지]
-    I --> J[데이터베이스]
-    I --> K[AI 분석 엔진]
-    
-    subgraph "실험 장비"
-        B
-        C
-        D
-        E
-        F
-    end
-    
-    subgraph "데이터 처리"
-        A
-        H
-        I
-        J
-        K
-    end
-    
-    subgraph "연구 환경"
-        G
-    end
+# 테스트 실행
+if __name__ == "__main__":
+    test_suite = SecurePayTestSuite()
+    test_suite.run_all_tests()
 ```
 
-### 실습 단계
+### 7단계: CI/CD 파이프라인 통합
 
-#### 1단계: 실험실 데이터 허브 구현
-```javascript
-// lab-hub/server.js
-const express = require('express');
-const https = require('https');
-const fs = require('fs');
-const multer = require('multer');
-const path = require('path');
+#### GitHub Actions 워크플로우
+```yaml
+# .github/workflows/secure-pay-ci.yml
+name: SecurePay CI/CD Pipeline
 
-const app = express();
-const PORT = 8443;
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
 
-// 미들웨어 설정
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+jobs:
+  security-setup:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup CA and Certificates
+      run: |
+        echo "🔐 CI/CD 환경 보안 설정 시작..."
+        
+        # CA 디렉토리 생성
+        mkdir -p ca/{certs,private,crl,newcerts}
+        mkdir -p certs
+        
+        # Root CA 생성
+        openssl genrsa -out ca/private/securepay-root-ca.key 4096
+        openssl req -new -x509 -days 3650 -key ca/private/securepay-root-ca.key \
+            -out ca/certs/securepay-root-ca.crt \
+            -subj "/C=KR/ST=Seoul/L=Seoul/O=SecurePay/OU=CI/CN=SecurePay CI CA"
+        
+        # CA 설정 파일 생성
+        cat > ca/ca.conf << 'EOF'
+        [ ca ]
+        default_ca = CA_default
+        
+        [ CA_default ]
+        dir = ./ca
+        certs = $dir/certs
+        crl_dir = $dir/crl
+        new_certs_dir = $dir/newcerts
+        database = $dir/index.txt
+        serial = $dir/serial
+        RANDFILE = $dir/.rand
+        
+        private_key = $dir/private/securepay-root-ca.key
+        certificate = $dir/certs/securepay-root-ca.crt
+        
+        default_md = sha256
+        default_days = 365
+        policy = policy_strict
+        
+        [ policy_strict ]
+        countryName = match
+        stateOrProvinceName = match
+        organizationName = match
+        commonName = supplied
+        
+        [ server_cert ]
+        basicConstraints = CA:FALSE
+        nsCertType = server
+        subjectKeyIdentifier = hash
+        authorityKeyIdentifier = keyid,issuer:always
+        keyUsage = critical, digitalSignature, keyEncipherment
+        extendedKeyUsage = serverAuth
+        EOF
+        
+        # CA 데이터베이스 초기화
+        touch ca/index.txt
+        echo 1000 > ca/serial
+        
+        # 서비스 인증서 생성
+        SERVICES=("api-gateway" "user-service" "payment-service" "notification-service")
+        for service in "${SERVICES[@]}"; do
+            openssl genrsa -out "certs/${service}-key.pem" 4096
+            openssl req -new -key "certs/${service}-key.pem" \
+                -out "certs/${service}.csr" \
+                -subj "/C=KR/ST=Seoul/L=Seoul/O=SecurePay/OU=CI/CN=${service}.securepay.local"
+            openssl ca -config ca/ca.conf -extensions server_cert -days 365 \
+                -notext -md sha256 -in "certs/${service}.csr" \
+                -out "certs/${service}-cert.pem"
+        done
+        
+        echo "✅ CI/CD 보안 설정 완료"
+    
+    - name: Upload Certificates
+      uses: actions/upload-artifact@v3
+      with:
+        name: ssl-certificates
+        path: |
+          ca/
+          certs/
 
-// 파일 업로드 설정
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage: storage });
-
-// 실험 데이터 저장소
-const experiments = new Map();
-const equipmentData = new Map();
-
-// 실험 등록
-app.post('/api/experiments', (req, res) => {
-    const { experimentId, name, researcher, description, equipment } = req.body;
+  test-services:
+    runs-on: ubuntu-latest
+    needs: security-setup
+    steps:
+    - uses: actions/checkout@v3
     
-    const experiment = {
-        id: experimentId,
-        name,
-        researcher,
-        description,
-        equipment,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        dataPoints: []
-    };
+    - name: Download Certificates
+      uses: actions/download-artifact@v3
+      with:
+        name: ssl-certificates
+        path: ./
     
-    experiments.set(experimentId, experiment);
+    - name: Setup Test Environment
+      run: |
+        # CA 인증서를 시스템에 추가
+        sudo cp ca/certs/securepay-root-ca.crt /usr/local/share/ca-certificates/
+        sudo update-ca-certificates
+        
+        # Docker Compose로 테스트 환경 시작
+        docker-compose up -d
     
-    console.log(`🧪 실험 등록: ${name} (연구원: ${researcher})`);
+    - name: Run API Tests
+      run: |
+        # API 테스트 실행
+        python test_secure_pay_api.py
     
-    res.json({
-        success: true,
-        experiment,
-        message: '실험이 성공적으로 등록되었습니다.'
-    });
-});
-
-// 장비 데이터 수신
-app.post('/api/equipment/:equipmentId/data', (req, res) => {
-    const { equipmentId } = req.params;
-    const { experimentId, dataType, data, timestamp, metadata } = req.body;
+    - name: Run Security Tests
+      run: |
+        # SSL/TLS 보안 테스트
+        echo "🔍 SSL/TLS 보안 검증 시작..."
+        
+        # 인증서 유효성 검증
+        openssl verify -CAfile ca/certs/securepay-root-ca.crt certs/api-gateway-cert.pem
+        openssl verify -CAfile ca/certs/securepay-root-ca.crt certs/user-service-cert.pem
+        
+        # TLS 연결 테스트
+        echo | openssl s_client -connect localhost:443 -servername api-dev.securepay.local
+        
+        echo "✅ 보안 테스트 완료"
     
-    if (!experiments.has(experimentId)) {
-        return res.status(404).json({ error: '실험을 찾을 수 없습니다.' });
-    }
-    
-    const dataPoint = {
-        equipmentId,
-        experimentId,
-        dataType,
-        data,
-        timestamp: timestamp || new Date().toISOString(),
-        metadata: metadata || {},
-        receivedAt: new Date().toISOString()
-    };
-    
-    // 실험에 데이터 포인트 추가
-    const experiment = experiments.get(experimentId);
-    experiment.dataPoints.push(dataPoint);
-    experiments.set(experimentId, experiment);
-    
-    // 장비별 데이터 저장
-    if (!equipmentData.has(equipmentId)) {
-        equipmentData.set(equipmentId, []);
-    }
-    equipmentData.get(equipmentId).push(dataPoint);
-    
-    console.log(`📊 장비 데이터 수신: ${equipmentId} - ${dataType}`);
-    
-    res.json({
-        success: true,
-        message: '데이터가 성공적으로 저장되었습니다.',
-        dataPoint
-    });
-});
-
-// 이미지 데이터 업로드
-app.post('/api/equipment/:equipmentId/image', upload.single('image'), (req, res) => {
-    const { equipmentId } = req.params;
-    const { experimentId, description } = req.body;
-    
-    if (!req.file) {
-        return res.status(400).json({ error: '이미지 파일이 없습니다.' });
-    }
-    
-    const imageData = {
-        equipmentId,
-        experimentId,
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        path: req.file.path,
-        size: req.file.size,
-        description,
-        uploadedAt: new Date().toISOString()
-    };
-    
-    console.log(`📸 이미지 업로드: ${req.file.originalname} (${req.file.size} bytes)`);
-    
-    res.json({
-        success: true,
-        image: imageData,
-        message: '이미지가 성공적으로 업로드되었습니다.'
-    });
-});
-
-// 실험 데이터 조회
-app.get('/api/experiments/:experimentId/data', (req, res) => {
-    const { experimentId } = req.params;
-    const { dataType, startDate, endDate, limit } = req.query;
-    
-    if (!experiments.has(experimentId)) {
-        return res.status(404).json({ error: '실험을 찾을 수 없습니다.' });
-    }
-    
-    let data = experiments.get(experimentId).dataPoints;
-    
-    // 필터링
-    if (dataType) {
-        data = data.filter(point => point.dataType === dataType);
-    }
-    
-    if (startDate) {
-        data = data.filter(point => new Date(point.timestamp) >= new Date(startDate));
-    }
-    
-    if (endDate) {
-        data = data.filter(point => new Date(point.timestamp) <= new Date(endDate));
-    }
-    
-    // 최신 데이터부터 정렬
-    data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    // 제한 적용
-    if (limit) {
-        data = data.slice(0, parseInt(limit));
-    }
-    
-    res.json({
-        experimentId,
-        data,
-        total: data.length,
-        retrievedAt: new Date().toISOString()
-    });
-});
-
-// 실험 목록 조회
-app.get('/api/experiments', (req, res) => {
-    const experimentList = Array.from(experiments.values());
-    
-    res.json({
-        experiments: experimentList,
-        total: experimentList.length,
-        active: experimentList.filter(e => e.status === 'active').length
-    });
-});
-
-// 데이터 분석 요청
-app.post('/api/experiments/:experimentId/analyze', (req, res) => {
-    const { experimentId } = req.params;
-    const { analysisType, parameters } = req.body;
-    
-    if (!experiments.has(experimentId)) {
-        return res.status(404).json({ error: '실험을 찾을 수 없습니다.' });
-    }
-    
-    const experiment = experiments.get(experimentId);
-    const data = experiment.dataPoints;
-    
-    // 간단한 데이터 분석 (실제로는 더 복잡한 분석 수행)
-    const analysis = this.performAnalysis(data, analysisType, parameters);
-    
-    console.log(`🔬 데이터 분석 요청: ${analysisType} (실험: ${experiment.name})`);
-    
-    res.json({
-        success: true,
-        analysis,
-        experimentId,
-        analysisType,
-        timestamp: new Date().toISOString()
-    });
-});
-
-// 데이터 분석 함수
-performAnalysis(data, analysisType, parameters) {
-    switch (analysisType) {
-        case 'statistical':
-            return this.statisticalAnalysis(data);
-        case 'trend':
-            return this.trendAnalysis(data);
-        case 'correlation':
-            return this.correlationAnalysis(data);
-        default:
-            return { error: '지원되지 않는 분석 타입입니다.' };
-    }
-}
-
-statisticalAnalysis(data) {
-    if (data.length === 0) return { error: '분석할 데이터가 없습니다.' };
-    
-    const values = data.map(d => d.data.value || 0).filter(v => !isNaN(v));
-    const sum = values.reduce((a, b) => a + b, 0);
-    const mean = sum / values.length;
-    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-    const stdDev = Math.sqrt(variance);
-    
-    return {
-        count: values.length,
-        mean: mean.toFixed(2),
-        standardDeviation: stdDev.toFixed(2),
-        min: Math.min(...values).toFixed(2),
-        max: Math.max(...values).toFixed(2)
-    };
-}
-
-trendAnalysis(data) {
-    if (data.length < 2) return { error: '트렌드 분석을 위한 데이터가 부족합니다.' };
-    
-    const sortedData = data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const values = sortedData.map(d => d.data.value || 0).filter(v => !isNaN(v));
-    
-    // 간단한 선형 회귀
-    const n = values.length;
-    const x = Array.from({length: n}, (_, i) => i);
-    const sumX = x.reduce((a, b) => a + b, 0);
-    const sumY = values.reduce((a, b) => a + b, 0);
-    const sumXY = x.reduce((sum, xi, i) => sum + xi * values[i], 0);
-    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
-    
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    
-    return {
-        slope: slope.toFixed(4),
-        intercept: intercept.toFixed(4),
-        trend: slope > 0 ? 'increasing' : slope < 0 ? 'decreasing' : 'stable',
-        correlation: this.calculateCorrelation(x, values).toFixed(4)
-    };
-}
-
-calculateCorrelation(x, y) {
-    const n = x.length;
-    const sumX = x.reduce((a, b) => a + b, 0);
-    const sumY = y.reduce((a, b) => a + b, 0);
-    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
-    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
-    const sumYY = y.reduce((sum, yi) => sum + yi * yi, 0);
-    
-    return (n * sumXY - sumX * sumY) / Math.sqrt((n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY));
-}
-
-// HTTPS 서버 설정
-const options = {
-    key: fs.readFileSync('lab-hub.localhost-key.pem'),
-    cert: fs.readFileSync('lab-hub.localhost.pem')
-};
-
-https.createServer(options, app).listen(PORT, () => {
-    console.log(`🧪 실험실 데이터 허브가 https://lab-hub.localhost:${PORT}에서 실행 중입니다.`);
-});
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down
+        docker system prune -f
 ```
 
-## 📚 다음 단계
+## 📊 결과 및 효과
 
-이제 실제 시나리오 기반 실습을 통해 사설 인증서의 활용 방법을 배웠습니다. 각 시나리오는 실제 개발 환경에서 자주 발생하는 상황을 바탕으로 구성되어 있어, 실무에 바로 적용할 수 있습니다.
+### 🎯 해결된 문제들
 
-**다음: [9. 고급 활용 및 최적화](./09-advanced-usage.md)**
+#### Before (문제 상황)
+```bash
+# 개발자들이 겪던 문제들
+curl http://api-dev.securepay.com/users
+# 결과: 브라우저에서 "Not Secure" 경고
+# 모바일 앱: SSL certificate verification failed
+# QA 테스트: 자동화 테스트에서 SSL 오류 발생
+```
 
----
+#### After (해결 후)
+```bash
+# 해결된 상황
+curl https://api-dev.securepay.local/api/users
+# 결과: 정상적인 HTTPS 통신, 브라우저에서 안전한 연결 표시
+# 모바일 앱: 개발 서버와 안전한 통신
+# QA 테스트: 모든 자동화 테스트 정상 실행
+```
 
-## 💡 핵심 정리
+### 📈 비즈니스 임팩트
 
-- **마이크로서비스**: API Gateway를 통한 서비스 간 HTTPS 통신
-- **IoT 시스템**: 실시간 디바이스 통신 및 웹 대시보드
-- **의료기기**: 환자 데이터 보호를 위한 강력한 암호화
-- **실험실 장비**: 연구 데이터 수집 및 분석 시스템
-- **실무 적용**: 각 시나리오는 실제 개발 환경에서 바로 활용 가능
+| 항목 | Before | After | 개선 효과 |
+|------|--------|-------|-----------|
+| **개발 속도** | 기능당 5일 | 기능당 3일 | 40% 향상 |
+| **보안 취약점** | 15개 발견 | 2개 발견 | 87% 감소 |
+| **QA 테스트 시간** | 2시간 | 30분 | 75% 단축 |
+| **모바일 앱 연결** | 30% 성공율 | 95% 성공율 | 65% 향상 |
+| **월 인증서 비용** | 500만원 | 0원 | 100% 절약 |
+
+### 🔐 보안 강화 효과
+
+#### 네트워크 보안
+- **서비스 간 통신 암호화**: 모든 마이크로서비스 간 TLS 통신
+- **클라이언트 인증**: 개발자별 개인 인증서로 접근 제어
+- **중간자 공격 방지**: 인증서 검증으로 네트워크 스니핑 차단
+
+#### 개발 보안
+- **민감 정보 보호**: 로그에서 개인정보 암호화 전송
+- **접근 제어**: 개발자별 권한 관리
+- **감사 추적**: 모든 API 호출에 대한 인증서 기반 로깅
+
+### 🚀 개발 생산성 향상
+
+#### 개발자 경험 개선
+```bash
+# 개발자가 이제 할 수 있는 것들
+# 1. 브라우저에서 경고 없는 안전한 개발
+# 2. 모바일 앱에서 개발 서버 연결
+# 3. 네트워크 디버깅 도구로 암호화된 통신 분석
+# 4. 실제 프로덕션과 동일한 보안 환경에서 개발
+```
+
+#### QA 팀 효율성
+```python
+# QA 팀이 이제 할 수 있는 것들
+# 1. 자동화 테스트에서 SSL 오류 없이 실행
+# 2. 실제 사용자 환경과 동일한 보안 테스트
+# 3. 모바일 디바이스에서 개발 서버 테스트
+# 4. 보안 취약점 사전 발견
+```
+
+## 💡 핵심 교훈
+
+### 1. **보안은 개발 초기부터 고려해야 함**
+- 프로덕션과 동일한 보안 환경에서 개발
+- 보안 문제를 나중에 해결하려면 비용이 10배 증가
+
+### 2. **사설 인증서의 전략적 활용**
+- 개발 단계에서는 비용 효율적인 사설 인증서 사용
+- 프로덕션에서는 공인 인증서로 전환하는 명확한 전략 필요
+
+### 3. **팀 전체의 보안 문화 조성**
+- 모든 개발자가 보안을 고려한 개발 습관 형성
+- 정기적인 보안 교육과 실습
+
+### 4. **자동화의 중요성**
+- 인증서 생성, 배포, 갱신 과정의 자동화
+- CI/CD 파이프라인에 보안 검증 통합
+
+이 시나리오를 통해 사설 인증서가 단순한 기술적 도구가 아닌, 비즈니스 성공을 위한 핵심 인프라임을 확인할 수 있습니다. 실제 개발 환경에서 발생하는 구체적인 문제들을 해결하면서 개발 생산성과 보안을 동시에 향상시킬 수 있는 실질적인 방법을 제시했습니다.
